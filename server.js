@@ -59,9 +59,14 @@ app.use('/api/user', userFeatureRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/admin', adminRoutes);
 
-app.get('/api/health', (req, res) => {
+// Platform Health & Root Uptime Monitoring (Render, AWS, Vercel)
+app.get(['/', '/api/health'], (req, res) => {
   res.status(200).json({ status: 'OK', service: 'NeuroMind Scholars API', timestamp: new Date() });
 });
+app.head(['/', '/api/health'], (req, res) => {
+  res.status(200).end();
+});
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 app.use(notFound);
 app.use(errorHandler);

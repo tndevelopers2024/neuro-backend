@@ -80,6 +80,13 @@ export const createTopic = async (req, res, next) => {
       }
     }
 
+    if (category && !subject) {
+      const parentCat = await Category.findById(category);
+      if (parentCat && parentCat.subject) {
+        subject = parentCat.subject;
+      }
+    }
+
     if (!category) {
       const defaultCat = await Category.findOne({});
       if (defaultCat) {

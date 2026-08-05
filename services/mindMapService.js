@@ -21,7 +21,6 @@ export const buildCategoryMapData = async (categorySlug) => {
   const branches = await Topic.find({
     category: category._id,
     parentTopic: null,
-    status: 'published',
   }).sort({ displayOrder: 1, createdAt: 1 });
 
   // For each branch, find its direct level-2 subtopics (e.g., ASD, ADHD under Neurodevelopmental Disorders)
@@ -29,7 +28,6 @@ export const buildCategoryMapData = async (categorySlug) => {
     branches.map(async (branch, index) => {
       const children = await Topic.find({
         parentTopic: branch._id,
-        status: 'published',
       }).sort({ displayOrder: 1 });
 
       // Use stored mapPosition if customized by admin, otherwise auto-calculate radial coordinates

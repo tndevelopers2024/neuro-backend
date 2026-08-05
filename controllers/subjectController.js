@@ -18,14 +18,22 @@ export const getSubjectBySlug = async (req, res, next) => {
     if (!subject) return res.status(404).json({ success: false, message: 'Subject not found' });
 
     // Include categories belonging to this subject, enriched with active database subtopics
-    const categories = await Category.find({ subject: subject._id, status: 'published' }).sort({ displayOrder: 1 }).lean();
-    const dbTopics = await Topic.find({ subject: subject._id }).sort({ displayOrder: 1 }).lean();
+    const categories = await Category.find({ subject: subject._id }).sort({ displayOrder: 1 }).lean();
+    const categoryIds = categories.map(cat => cat._id);
+
+    const dbTopics = await Topic.find({
+      $or: [
+        { category: { $in: categoryIds } },
+        { subject: subject._id }
+      ],
+      parentTopic: null
+    }).sort({ displayOrder: 1 }).lean();
 
     const categoriesWithSubtopics = categories.map(cat => {
       const matchedTopics = dbTopics.filter(t => t.category && t.category.toString() === cat._id.toString());
       return {
         ...cat,
-        subtopics: matchedTopics.length > 0 ? matchedTopics : undefined
+        subtopics: matchedTopics.length > 0 ? matchedTopics : []
       };
     });
 

@@ -47,6 +47,25 @@ export const updateProgress = async (req, res, next) => {
   }
 };
 
+// @desc    Get progress and saved resume timestamp for a specific study material
+// @route   GET /api/progress/item/:materialId
+export const getItemProgress = async (req, res, next) => {
+  try {
+    const progress = await LearningProgress.findOne({
+      user: req.user._id,
+      material: req.params.materialId,
+    });
+    res.status(200).json({
+      success: true,
+      lastPosition: progress ? progress.lastPosition : 0,
+      progressPercentage: progress ? progress.progressPercentage : 0,
+      completed: progress ? progress.completed : false,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Get dynamic progress metrics for student Sidebar and Dashboard
 // @route   GET /api/progress/me
 export const getStudentProgressStats = async (req, res, next) => {

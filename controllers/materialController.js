@@ -3,6 +3,9 @@ import Topic from '../models/Topic.js';
 import MCQ from '../models/MCQ.js';
 import Flashcard from '../models/Flashcard.js';
 import { getTopicBreadcrumbs } from '../services/mindMapService.js';
+import cloudinary from '../config/cloudinary.js';
+import fs from 'fs';
+import LearningProgress from '../models/LearningProgress.js';
 
 // @desc    Get learning materials and next/prev sequential guidance for Screen 4
 // @route   GET /api/materials/topic/:topicSlug
@@ -28,6 +31,18 @@ export const getTopicMaterials = async (req, res, next) => {
 
     const breadcrumbs = await getTopicBreadcrumbs(topic.slug);
 
+    // Attach progress if user is authenticated
+    const materialsWithProgress = await Promise.all(
+      materials.map(async (m) => {
+        let progressPercent = 0;
+        if (req.user) {
+          const progress = await LearningProgress.findOne({ user: req.user._id, material: m._id });
+          if (progress) progressPercent = progress.progressPercentage;
+        }
+        return { ...m.toObject(), progressPercentage: progressPercent };
+      })
+    );
+
     res.status(200).json({
       success: true,
       topic: {
@@ -38,7 +53,7 @@ export const getTopicMaterials = async (req, res, next) => {
         parentTopic: topic.parentTopic,
         category: topic.category,
       },
-      materials,
+      materials: materialsWithProgress,
       counts: {
         mcqs: mcqsCount,
         flashcards: flashcardsCount,
@@ -99,7 +114,12 @@ export const createMaterial = async (req, res, next) => {
     let finalVideoUrl = videoUrl;
     if (req.file) {
       if (type === 'VIDEO') {
-        finalVideoUrl = `/uploads/videos/${req.file.filename}`;
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          resource_type: 'video',
+          folder: 'neuromind_videos'
+        });
+        finalVideoUrl = result.secure_url;
+        fs.unlinkSync(req.file.path); // Delete local file
       } else if (type === 'PDF' || type === 'NOTES') {
         finalFileUrl = `/uploads/pdfs/${req.file.filename}`;
       } else {
@@ -147,7 +167,12 @@ export const updateMaterial = async (req, res, next) => {
     if (req.file) {
       const type = req.body.type || material.type;
       if (type === 'VIDEO') {
-        req.body.videoUrl = `/uploads/videos/${req.file.filename}`;
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          resource_type: 'video',
+          folder: 'neuromind_videos'
+        });
+        req.body.videoUrl = result.secure_url;
+        fs.unlinkSync(req.file.path); // Delete local file
       } else if (type === 'PDF' || type === 'NOTES') {
         req.body.fileUrl = `/uploads/pdfs/${req.file.filename}`;
       } else {

@@ -1,4 +1,5 @@
 import LearningProgress from '../models/LearningProgress.js';
+import Category from '../models/Category.js';
 import Topic from '../models/Topic.js';
 import StudyMaterial from '../models/StudyMaterial.js';
 import QuizAttempt from '../models/QuizAttempt.js';
@@ -90,9 +91,9 @@ export const getStudentProgressStats = async (req, res, next) => {
     // Dynamic percentage calculation formula
     let calculatedPercentage = 0;
     if (totalPublishedTopics > 0) {
-      // Base on ratio of completed topics & items, default fallback to realistic 68% for demonstration if demo account
+      // Base on ratio of completed topics & items
       const actualRatio = Math.round((exploredTopicsCount.length / (totalPublishedTopics || 1)) * 100);
-      calculatedPercentage = exploredTopicsCount.length > 0 ? Math.min(100, Math.max(actualRatio, 25)) : (req.user.email === 'resident@neuromind.edu' ? 68 : 0);
+      calculatedPercentage = exploredTopicsCount.length > 0 ? Math.min(100, Math.max(actualRatio, 25)) : 0;
     }
 
     // Recent learning items
@@ -100,19 +101,31 @@ export const getStudentProgressStats = async (req, res, next) => {
       .sort({ accessedAt: -1 })
       .limit(12);
 
+    // Fetch dynamic shortcuts
+    const firstCategory = await Category.findOne({ status: 'published' }).populate('subject');
+    const firstTopic = await Topic.findOne({ status: 'published' });
+    const firstMaterial = await StudyMaterial.findOne({ status: 'published' }).populate('topic');
+
+    const recommendedShortcuts = {
+      orbit: firstCategory ? { title: firstCategory.name, link: `/learn/${firstCategory.subject?.slug || 'subject'}/${firstCategory.slug}` } : null,
+      map: firstTopic ? { title: firstTopic.title, link: `/topic/${firstTopic.slug}` } : null,
+      video: firstMaterial ? { title: firstMaterial.title, link: `/lesson/${firstMaterial.topic?.slug || 'topic'}` } : null,
+    };
+
     res.status(200).json({
       success: true,
       stats: {
-        progressPercentage: req.user.email === 'resident@neuromind.edu' && calculatedPercentage === 0 ? 68 : calculatedPercentage,
-        topicsExplored: exploredTopicsCount.length > 0 ? exploredTopicsCount.length : (req.user.email === 'resident@neuromind.edu' ? 124 : 0),
-        totalTopics: totalPublishedTopics > 0 ? totalPublishedTopics : 182,
-        notesCreated: notesCount > 0 ? notesCount : (req.user.email === 'resident@neuromind.edu' ? 36 : 0),
-        flashcardsAvailable: flashcardsCount > 0 ? flashcardsCount : 220,
-        quizzesTaken: quizzesCount > 0 ? quizzesCount : (req.user.email === 'resident@neuromind.edu' ? 18 : 0),
+        progressPercentage: calculatedPercentage,
+        topicsExplored: exploredTopicsCount.length,
+        totalTopics: totalPublishedTopics,
+        notesCreated: notesCount,
+        flashcardsAvailable: flashcardsCount,
+        quizzesTaken: quizzesCount,
         bookmarksCount,
-        studyStreak: req.user.studyStreak || 7,
+        studyStreak: req.user.studyStreak || 0,
       },
       recentActivity,
+      recommendedShortcuts,
     });
   } catch (error) {
     next(error);

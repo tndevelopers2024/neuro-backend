@@ -5,8 +5,8 @@ import { upload } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
-router.get('/topic/:topicSlug', getTopicMaterials);
-router.get('/:id', getMaterialById);
+router.get('/topic/:topicSlug', authenticateUser, getTopicMaterials);
+router.get('/:id', authenticateUser, getMaterialById);
 
 // Admin Material Management & Multi-format File Uploads
 router.get('/admin/all', authenticateUser, requireAdmin, getAdminMaterials);

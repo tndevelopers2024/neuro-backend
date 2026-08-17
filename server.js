@@ -20,6 +20,8 @@ import progressRoutes from './routes/progressRoutes.js';
 import userFeatureRoutes from './routes/userFeatureRoutes.js';
 import searchRoutes from './routes/searchRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import annotationRoutes from './routes/annotationRoutes.js';
+import commentRoutes from './routes/commentRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -66,6 +68,8 @@ app.use('/api/progress', progressRoutes);
 app.use('/api/user', userFeatureRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/annotations', annotationRoutes);
+app.use('/api/comments', commentRoutes);
 
 // Platform Health & Root Uptime Monitoring (Render, AWS, Vercel)
 app.get(['/', '/api/health'], (req, res) => {

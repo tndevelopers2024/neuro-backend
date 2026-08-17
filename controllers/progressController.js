@@ -14,32 +14,49 @@ export const updateProgress = async (req, res, next) => {
   try {
     const { topicId, materialId, materialType, progressPercentage, lastPosition } = req.body;
 
-    const isComplete = progressPercentage >= 90;
+    const filter = { user: req.user._id, topic: topicId, materialType };
+    if (materialId) filter.material = materialId;
+
+    let progress = await LearningProgress.findOne(filter);
+    
+    const isComplete = progressPercentage >= 90 || (progress && progress.completed);
+    const newPercentage = progress 
+      ? Math.max(progress.progressPercentage, Math.min(progressPercentage, 100)) 
+      : Math.min(progressPercentage, 100);
 
     const updateData = {
-      progressPercentage: Math.min(progressPercentage, 100),
+      progressPercentage: newPercentage,
       completed: isComplete,
       lastPosition: lastPosition || 0,
       lastAccessedAt: new Date(),
     };
-    if (isComplete) updateData.completedAt = new Date();
+    if (isComplete && (!progress || !progress.completed)) {
+      updateData.completedAt = new Date();
+    }
 
-    const filter = { user: req.user._id, topic: topicId, materialType };
-    if (materialId) filter.material = materialId;
+    if (progress) {
+      progress = await LearningProgress.findOneAndUpdate(filter, updateData, { new: true });
+    } else {
+      progress = await LearningProgress.create({ ...filter, ...updateData });
+    }
 
-    const progress = await LearningProgress.findOneAndUpdate(filter, updateData, { upsert: true, new: true });
-
-    // Log recent activity
+    // Log recent activity (use upsert to prevent duplicates if repeatedly triggered)
     const topic = await Topic.findById(topicId);
     if (topic && isComplete) {
-      await RecentActivity.create({
-        user: req.user._id,
-        title: `Completed ${materialType}: ${topic.title}`,
-        subtitle: `Mastered 100% of study content`,
-        link: `/topic/${topic.slug}`,
-        type: materialType === 'VIDEO' ? 'Video' : 'Notes',
-        icon: materialType === 'VIDEO' ? 'PlayCircle' : 'FileText',
-      });
+      await RecentActivity.findOneAndUpdate(
+        { 
+          user: req.user._id, 
+          link: `/topic/${topic.slug}`,
+          title: `Completed ${materialType}: ${topic.title}`
+        },
+        {
+          subtitle: `Mastered 100% of study content`,
+          type: materialType === 'VIDEO' ? 'Video' : 'Notes',
+          icon: materialType === 'VIDEO' ? 'PlayCircle' : 'FileText',
+          accessedAt: new Date()
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
     }
 
     res.status(200).json({ success: true, progress });
@@ -80,8 +97,9 @@ export const getStudentProgressStats = async (req, res, next) => {
       completed: true,
     });
     
-    // Count distinct explored topics
-    const exploredTopicsCount = await LearningProgress.distinct('topic', { user: req.user._id });
+    // Count distinct explored topics (filter out nulls)
+    const exploredTopicsRaw = await LearningProgress.distinct('topic', { user: req.user._id });
+    const exploredTopicsCount = exploredTopicsRaw.filter(t => t != null).length;
     
     const notesCount = await PersonalNote.countDocuments({ user: req.user._id });
     const flashcardsCount = await Flashcard.countDocuments();
@@ -92,8 +110,8 @@ export const getStudentProgressStats = async (req, res, next) => {
     let calculatedPercentage = 0;
     if (totalPublishedTopics > 0) {
       // Base on ratio of completed topics & items
-      const actualRatio = Math.round((exploredTopicsCount.length / (totalPublishedTopics || 1)) * 100);
-      calculatedPercentage = exploredTopicsCount.length > 0 ? Math.min(100, Math.max(actualRatio, 25)) : 0;
+      const actualRatio = Math.round((exploredTopicsCount / totalPublishedTopics) * 100);
+      calculatedPercentage = exploredTopicsCount > 0 ? Math.min(100, Math.max(actualRatio, 5)) : 0;
     }
 
     // Recent learning items
@@ -116,7 +134,7 @@ export const getStudentProgressStats = async (req, res, next) => {
       success: true,
       stats: {
         progressPercentage: calculatedPercentage,
-        topicsExplored: exploredTopicsCount.length,
+        topicsExplored: exploredTopicsCount,
         totalTopics: totalPublishedTopics,
         notesCreated: notesCount,
         flashcardsAvailable: flashcardsCount,

@@ -11,7 +11,6 @@ const quizAttemptSchema = new mongoose.Schema(
     topic: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Topic',
-      required: true,
       index: true,
     },
     totalQuestions: { type: Number, required: true },

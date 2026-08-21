@@ -9,11 +9,23 @@ import { getTopicBreadcrumbs } from '../services/mindMapService.js';
 // @route   GET /api/quiz/topic/:topicSlug
 export const getTopicMCQs = async (req, res, next) => {
   try {
-    const topic = await Topic.findOne({ slug: req.params.topicSlug });
-    if (!topic) return res.status(404).json({ success: false, message: 'Topic not found' });
+    let topic;
+    let filter = {};
+    let breadcrumbs = [];
 
-    const mcqs = await MCQ.find({ topic: topic._id });
-    const breadcrumbs = await getTopicBreadcrumbs(topic.slug);
+    if (req.params.topicSlug && req.params.topicSlug !== 'all') {
+      topic = await Topic.findOne({ slug: req.params.topicSlug });
+      if (!topic) return res.status(404).json({ success: false, message: 'Topic not found' });
+      filter.topic = topic._id;
+      breadcrumbs = await getTopicBreadcrumbs(topic.slug);
+    } else {
+      topic = { _id: 'all', title: 'Comprehensive Mix', slug: 'all' };
+      breadcrumbs = [{ title: 'All Topics', slug: 'all' }];
+    }
+
+    // For 'all', we might want to limit the questions to avoid massive payloads, 
+    // but for now we'll fetch them normally.
+    const mcqs = await MCQ.find(filter).limit(100);
 
     res.status(200).json({
       success: true,
@@ -47,39 +59,56 @@ export const submitQuizAttempt = async (req, res, next) => {
     const incorrectAnswers = totalQuestions - correctAnswers;
     const scorePercentage = Math.round((correctAnswers / totalQuestions) * 100);
 
-    const attempt = await QuizAttempt.create({
+    const attemptData = {
       user: req.user._id,
-      topic: topicId,
       totalQuestions,
       correctAnswers,
       incorrectAnswers,
       scorePercentage,
       timeTakenSeconds,
-    });
+    };
+    
+    if (topicId && topicId !== 'all') {
+      attemptData.topic = topicId;
+    }
 
-    const topic = await Topic.findById(topicId);
-    if (topic) {
-      // Record in Recent Activity
+    const attempt = await QuizAttempt.create(attemptData);
+
+    if (topicId && topicId !== 'all') {
+      const topic = await Topic.findById(topicId);
+      if (topic) {
+        // Record in Recent Activity
+        await RecentActivity.create({
+          user: req.user._id,
+          title: `Completed MCQ Quiz: ${topic.title}`,
+          subtitle: `Score: ${scorePercentage}% (${correctAnswers}/${totalQuestions} correct)`,
+          link: `/quiz/${topic.slug}`,
+          type: 'MCQ',
+          icon: 'CheckCircle2',
+        });
+
+        // Update learning progress
+        await LearningProgress.findOneAndUpdate(
+          { user: req.user._id, topic: topic._id, materialType: 'MCQ' },
+          {
+            progressPercentage: 100,
+            completed: scorePercentage >= 60, // Passed if >= 60%
+            lastAccessedAt: new Date(),
+            completedAt: new Date(),
+          },
+          { upsert: true, new: true }
+        );
+      }
+    } else if (topicId === 'all') {
+      // Record generic activity for 'all' topics quiz
       await RecentActivity.create({
         user: req.user._id,
-        title: `Completed MCQ Quiz: ${topic.title}`,
+        title: `Completed Comprehensive Quiz`,
         subtitle: `Score: ${scorePercentage}% (${correctAnswers}/${totalQuestions} correct)`,
-        link: `/quiz/${topic.slug}`,
+        link: `/quiz/all`,
         type: 'MCQ',
         icon: 'CheckCircle2',
       });
-
-      // Update learning progress
-      await LearningProgress.findOneAndUpdate(
-        { user: req.user._id, topic: topic._id, materialType: 'MCQ' },
-        {
-          progressPercentage: 100,
-          completed: scorePercentage >= 60, // Passed if >= 60%
-          lastAccessedAt: new Date(),
-          completedAt: new Date(),
-        },
-        { upsert: true, new: true }
-      );
     }
 
     res.status(201).json({ success: true, attempt, scorePercentage });

@@ -14,9 +14,18 @@ export const getTopicMaterials = async (req, res, next) => {
     const topic = await Topic.findOne({ slug: req.params.topicSlug }).populate('parentTopic').populate('category');
     if (!topic) return res.status(404).json({ success: false, message: 'Topic lesson not found' });
 
-    const materials = await StudyMaterial.find({ topic: topic._id, status: 'published' }).sort({ displayOrder: 1 });
-    const mcqsCount = await MCQ.countDocuments({ topic: topic._id });
-    const flashcardsCount = await Flashcard.countDocuments({ topic: topic._id });
+    // Find all descendant topics (children and grandchildren) to aggregate materials
+    const childTopics = await Topic.find({ parentTopic: topic._id });
+    const childIds = childTopics.map(t => t._id);
+    
+    const grandChildTopics = await Topic.find({ parentTopic: { $in: childIds } });
+    const grandChildIds = grandChildTopics.map(t => t._id);
+
+    const allTopicIds = [topic._id, ...childIds, ...grandChildIds];
+
+    const materials = await StudyMaterial.find({ topic: { $in: allTopicIds }, status: 'published' }).sort({ displayOrder: 1 });
+    const mcqsCount = await MCQ.countDocuments({ topic: { $in: allTopicIds } });
+    const flashcardsCount = await Flashcard.countDocuments({ topic: { $in: allTopicIds } });
 
     // Calculate dynamic Next and Previous topic lessons using displayOrder
     const siblings = await Topic.find({
@@ -53,6 +62,7 @@ export const getTopicMaterials = async (req, res, next) => {
         parentTopic: topic.parentTopic,
         category: topic.category,
       },
+      childTopics,
       materials: materialsWithProgress,
       counts: {
         mcqs: mcqsCount,

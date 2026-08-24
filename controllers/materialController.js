@@ -5,7 +5,47 @@ import Flashcard from '../models/Flashcard.js';
 import { getTopicBreadcrumbs } from '../services/mindMapService.js';
 import cloudinary from '../config/cloudinary.js';
 import fs from 'fs';
+import path from 'path';
+import docxConverter from 'docx-pdf';
 import LearningProgress from '../models/LearningProgress.js';
+import WordExtractor from 'word-extractor';
+import PDFDocument from 'pdfkit';
+
+// Helper to validate DOCX (ZIP) signature to prevent jszip crashes on fake docx files
+const isValidDocx = (filePath) => {
+  try {
+    const buffer = Buffer.alloc(4);
+    const fd = fs.openSync(filePath, 'r');
+    fs.readSync(fd, buffer, 0, 4, 0);
+    fs.closeSync(fd);
+    return buffer.toString('hex') === '504b0304';
+  } catch (err) {
+    return false;
+  }
+};
+
+// Helper to extract text from legacy .doc and generate a basic PDF
+const convertLegacyDocToPdf = async (inputPath, outputPath) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const extractor = new WordExtractor();
+      const extracted = await extractor.extract(inputPath);
+      const text = extracted.getBody();
+      
+      const doc = new PDFDocument();
+      const writeStream = fs.createWriteStream(outputPath);
+      doc.pipe(writeStream);
+      doc.fontSize(12).text(text || "No text could be extracted from this legacy document.", { align: 'left' });
+      doc.end();
+      
+      writeStream.on('finish', () => resolve(true));
+      writeStream.on('error', (err) => reject(err));
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
+
 
 // @desc    Get learning materials and next/prev sequential guidance for Screen 4
 // @route   GET /api/materials/topic/:topicSlug
@@ -130,8 +170,39 @@ export const createMaterial = async (req, res, next) => {
         });
         finalVideoUrl = result.secure_url;
         fs.unlinkSync(req.file.path); // Delete local file
-      } else if (type === 'PDF' || type === 'NOTES') {
+      } else if (req.file.mimetype === 'application/pdf') {
         finalFileUrl = `/uploads/pdfs/${req.file.filename}`;
+      } else if (req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || req.file.mimetype === 'application/msword') {
+        const newFilename = req.file.filename.replace(/\.docx?$/i, '.pdf');
+        const outputPath = path.resolve('uploads', 'pdfs', newFilename);
+        const inputPath = path.resolve(req.file.path);
+
+        if (!isValidDocx(req.file.path)) {
+          // Fake DOCX (renamed .doc) or actual .doc file. Convert using text extraction.
+          try {
+            await convertLegacyDocToPdf(inputPath, outputPath);
+            finalFileUrl = `/uploads/pdfs/${newFilename}`;
+          } catch (err) {
+            fs.unlinkSync(req.file.path);
+            return res.status(500).json({ success: false, message: 'Failed to convert legacy document to PDF.' });
+          }
+          fs.unlinkSync(req.file.path); // Delete original doc
+        } else {
+          // Convert genuine DOCX to PDF automatically
+          try {
+            await new Promise((resolve, reject) => {
+              docxConverter(inputPath, outputPath, (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+              });
+            });
+            finalFileUrl = `/uploads/pdfs/${newFilename}`;
+          } catch (err) {
+            fs.unlinkSync(req.file.path);
+            return res.status(500).json({ success: false, message: 'Failed to convert document to PDF.' });
+          }
+          fs.unlinkSync(req.file.path); // Delete original docx
+        }
       } else {
         finalFileUrl = `/uploads/resources/${req.file.filename}`;
       }
@@ -183,8 +254,39 @@ export const updateMaterial = async (req, res, next) => {
         });
         req.body.videoUrl = result.secure_url;
         fs.unlinkSync(req.file.path); // Delete local file
-      } else if (type === 'PDF' || type === 'NOTES') {
+      } else if (req.file.mimetype === 'application/pdf') {
         req.body.fileUrl = `/uploads/pdfs/${req.file.filename}`;
+      } else if (req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || req.file.mimetype === 'application/msword') {
+        const newFilename = req.file.filename.replace(/\.docx?$/i, '.pdf');
+        const outputPath = path.resolve('uploads', 'pdfs', newFilename);
+        const inputPath = path.resolve(req.file.path);
+
+        if (!isValidDocx(req.file.path)) {
+          // Fake DOCX (renamed .doc) or actual .doc file. Convert using text extraction.
+          try {
+            await convertLegacyDocToPdf(inputPath, outputPath);
+            req.body.fileUrl = `/uploads/pdfs/${newFilename}`;
+          } catch (err) {
+            fs.unlinkSync(req.file.path);
+            return res.status(500).json({ success: false, message: 'Failed to convert legacy document to PDF.' });
+          }
+          fs.unlinkSync(req.file.path); // Delete original doc
+        } else {
+          // Convert genuine DOCX to PDF automatically
+          try {
+            await new Promise((resolve, reject) => {
+              docxConverter(inputPath, outputPath, (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+              });
+            });
+            req.body.fileUrl = `/uploads/pdfs/${newFilename}`;
+          } catch (err) {
+            fs.unlinkSync(req.file.path);
+            return res.status(500).json({ success: false, message: 'Failed to convert document to PDF.' });
+          }
+          fs.unlinkSync(req.file.path); // Delete original docx
+        }
       } else {
         req.body.fileUrl = `/uploads/resources/${req.file.filename}`;
       }

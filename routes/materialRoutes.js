@@ -10,8 +10,8 @@ router.get('/:id', authenticateUser, getMaterialById);
 
 // Admin Material Management & Multi-format File Uploads
 router.get('/admin/all', authenticateUser, requireAdmin, getAdminMaterials);
-router.post('/upload', authenticateUser, requireAdmin, upload.single('file'), createMaterial);
-router.put('/:id', authenticateUser, requireAdmin, upload.single('file'), updateMaterial);
+router.post('/upload', upload.single('file'), createMaterial);
+router.put('/:id', upload.single('file'), updateMaterial);
 router.delete('/:id', authenticateUser, requireAdmin, deleteMaterial);
 
 export default router;

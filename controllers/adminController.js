@@ -104,3 +104,28 @@ export const getUsers = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Delete a student user
+// @route   DELETE /api/admin/users/:id
+export const deleteUser = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    // Prevent deleting admins
+    if (user.role === 'admin') {
+      return res.status(403).json({ success: false, message: 'Cannot delete admin users' });
+    }
+
+    await User.findByIdAndDelete(req.params.id);
+    
+    // Optionally: cascade delete their progress, notes, etc.
+    // await LearningProgress.deleteMany({ user: req.params.id });
+    
+    res.status(200).json({ success: true, message: 'User deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};

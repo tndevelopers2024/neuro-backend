@@ -33,6 +33,7 @@ export const getTopicMCQs = async (req, res, next) => {
       topic: { _id: topic._id, title: topic.title, slug: topic.slug },
       mcqs: mcqs.map((q) => ({
         _id: q._id,
+        type: q.type,
         question: q.question,
         optionA: q.optionA,
         optionB: q.optionB,
@@ -40,8 +41,11 @@ export const getTopicMCQs = async (req, res, next) => {
         optionD: q.optionD,
         subtopic: q.subtopic,
         difficulty: q.difficulty,
-        // Notice: explanations & answers can be checked client side or evaluated on submit
         correctAnswer: q.correctAnswer,
+        correctAnswers: q.correctAnswers,
+        matrixLeft: q.matrixLeft,
+        matrixRight: q.matrixRight,
+        matrixMatches: q.matrixMatches,
         explanation: q.explanation,
       })),
       breadcrumbs,

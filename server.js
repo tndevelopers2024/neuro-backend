@@ -22,6 +22,7 @@ import searchRoutes from './routes/searchRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import annotationRoutes from './routes/annotationRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
+import uploadRoutes from './routes/uploadRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -70,6 +71,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/annotations', annotationRoutes);
 app.use('/api/comments', commentRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Platform Health & Root Uptime Monitoring (Render, AWS, Vercel)
 app.get(['/', '/api/health'], (req, res) => {

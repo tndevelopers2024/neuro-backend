@@ -30,7 +30,9 @@ const userSchema = new mongoose.Schema(
     },
     profileImage: {
       type: String,
-      default: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+      default: function () {
+        return `https://ui-avatars.com/api/?name=${encodeURIComponent(this.fullName || 'Scholar')}&background=126BEE&color=fff&size=250`;
+      },
     },
     medicalCollege: {
       type: String,

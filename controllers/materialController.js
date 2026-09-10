@@ -172,37 +172,13 @@ export const createMaterial = async (req, res, next) => {
         fs.unlinkSync(req.file.path); // Delete local file
       } else if (req.file.mimetype === 'application/pdf') {
         finalFileUrl = `/uploads/pdfs/${req.file.filename}`;
-      } else if (req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || req.file.mimetype === 'application/msword') {
-        const newFilename = req.file.filename.replace(/\.docx?$/i, '.pdf');
-        const outputPath = path.resolve('uploads', 'pdfs', newFilename);
-        const inputPath = path.resolve(req.file.path);
-
-        if (!isValidDocx(req.file.path)) {
-          // Fake DOCX (renamed .doc) or actual .doc file. Convert using text extraction.
-          try {
-            await convertLegacyDocToPdf(inputPath, outputPath);
-            finalFileUrl = `/uploads/pdfs/${newFilename}`;
-          } catch (err) {
-            fs.unlinkSync(req.file.path);
-            return res.status(500).json({ success: false, message: 'Failed to convert legacy document to PDF.' });
-          }
-          fs.unlinkSync(req.file.path); // Delete original doc
-        } else {
-          // Convert genuine DOCX to PDF automatically
-          try {
-            await new Promise((resolve, reject) => {
-              docxConverter(inputPath, outputPath, (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-              });
-            });
-            finalFileUrl = `/uploads/pdfs/${newFilename}`;
-          } catch (err) {
-            fs.unlinkSync(req.file.path);
-            return res.status(500).json({ success: false, message: 'Failed to convert document to PDF.' });
-          }
-          fs.unlinkSync(req.file.path); // Delete original docx
-        }
+      } else if (
+        req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+        req.file.mimetype === 'application/msword' ||
+        path.extname(req.file.originalname).match(/\.docx?$/i)
+      ) {
+        // Genuine DOCX/DOC documents are preserved intact to retain tables, cell background colors, and formatting
+        finalFileUrl = `/uploads/resources/${req.file.filename}`;
       } else {
         finalFileUrl = `/uploads/resources/${req.file.filename}`;
       }
@@ -256,37 +232,13 @@ export const updateMaterial = async (req, res, next) => {
         fs.unlinkSync(req.file.path); // Delete local file
       } else if (req.file.mimetype === 'application/pdf') {
         req.body.fileUrl = `/uploads/pdfs/${req.file.filename}`;
-      } else if (req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || req.file.mimetype === 'application/msword') {
-        const newFilename = req.file.filename.replace(/\.docx?$/i, '.pdf');
-        const outputPath = path.resolve('uploads', 'pdfs', newFilename);
-        const inputPath = path.resolve(req.file.path);
-
-        if (!isValidDocx(req.file.path)) {
-          // Fake DOCX (renamed .doc) or actual .doc file. Convert using text extraction.
-          try {
-            await convertLegacyDocToPdf(inputPath, outputPath);
-            req.body.fileUrl = `/uploads/pdfs/${newFilename}`;
-          } catch (err) {
-            fs.unlinkSync(req.file.path);
-            return res.status(500).json({ success: false, message: 'Failed to convert legacy document to PDF.' });
-          }
-          fs.unlinkSync(req.file.path); // Delete original doc
-        } else {
-          // Convert genuine DOCX to PDF automatically
-          try {
-            await new Promise((resolve, reject) => {
-              docxConverter(inputPath, outputPath, (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-              });
-            });
-            req.body.fileUrl = `/uploads/pdfs/${newFilename}`;
-          } catch (err) {
-            fs.unlinkSync(req.file.path);
-            return res.status(500).json({ success: false, message: 'Failed to convert document to PDF.' });
-          }
-          fs.unlinkSync(req.file.path); // Delete original docx
-        }
+      } else if (
+        req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+        req.file.mimetype === 'application/msword' ||
+        path.extname(req.file.originalname).match(/\.docx?$/i)
+      ) {
+        // Genuine DOCX/DOC documents are preserved intact to retain tables, cell background colors, and formatting
+        req.body.fileUrl = `/uploads/resources/${req.file.filename}`;
       } else {
         req.body.fileUrl = `/uploads/resources/${req.file.filename}`;
       }

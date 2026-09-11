@@ -24,3 +24,7 @@ node_modules/
 *.njsproj
 *.sln
 *.sw?
+
+# Uploaded files
+uploads/*
+!uploads/.gitkeep

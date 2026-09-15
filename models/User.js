@@ -64,6 +64,12 @@ const userSchema = new mongoose.Schema(
 
 // Encrypt password using bcrypt prior to saving
 userSchema.pre('save', async function (next) {
+  if (this.profileImage && typeof this.profileImage === 'string') {
+    if (this.profileImage.includes('/uploads/')) {
+      this.profileImage = this.profileImage.substring(this.profileImage.indexOf('/uploads/'));
+    }
+  }
+
   if (!this.isModified('password')) {
     return next();
   }

@@ -206,7 +206,13 @@ export const updateProfile = async (req, res, next) => {
     if (course) user.course = course;
     if (year) user.year = year;
     if (specialization) user.specialization = specialization;
-    if (profileImage) user.profileImage = profileImage;
+    if (profileImage !== undefined) {
+      let cleaned = profileImage;
+      if (typeof cleaned === 'string' && cleaned.includes('/uploads/')) {
+        cleaned = cleaned.substring(cleaned.indexOf('/uploads/'));
+      }
+      user.profileImage = cleaned;
+    }
 
     if (newPassword) {
       if (!currentPassword || !(await user.comparePassword(currentPassword))) {

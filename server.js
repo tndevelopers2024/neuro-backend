@@ -56,6 +56,7 @@ app.use(morgan('dev'));
 
 // Static routing for media files and uploaded PDF/Video assets
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Mount API Endpoints
 app.use('/api/auth', authRoutes);

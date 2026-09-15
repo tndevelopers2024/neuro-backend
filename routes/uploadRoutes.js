@@ -10,8 +10,12 @@ router.post('/', authenticateUser, upload.single('file'), (req, res) => {
     return res.status(400).json({ success: false, message: 'No file uploaded' });
   }
   
-  // Convert Windows backslashes to forward slashes for the URL
-  const fileUrl = `/${req.file.path.replace(/\\/g, '/')}`;
+  let subfolder = 'resources';
+  if (req.file.mimetype.startsWith('video/')) subfolder = 'videos';
+  else if (req.file.mimetype === 'application/pdf') subfolder = 'pdfs';
+  else if (req.file.mimetype.startsWith('image/')) subfolder = 'images';
+
+  const fileUrl = `/uploads/${subfolder}/${req.file.filename}`;
   
   res.status(200).json({
     success: true,

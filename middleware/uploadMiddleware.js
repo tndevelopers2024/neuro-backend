@@ -1,19 +1,25 @@
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 import crypto from 'crypto';
+import { UPLOADS_DIR } from '../config/storage.js';
 
-// Custom disk storage engine routing files into organized subfolders
+// Custom disk storage engine routing files into persistent subfolders
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
+    let subfolder = 'resources';
     if (file.mimetype.startsWith('video/')) {
-      cb(null, 'uploads/videos');
+      subfolder = 'videos';
     } else if (file.mimetype === 'application/pdf') {
-      cb(null, 'uploads/pdfs');
+      subfolder = 'pdfs';
     } else if (file.mimetype.startsWith('image/')) {
-      cb(null, 'uploads/images');
-    } else {
-      cb(null, 'uploads/resources');
+      subfolder = 'images';
     }
+    const targetDir = path.join(UPLOADS_DIR, subfolder);
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+    cb(null, targetDir);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;

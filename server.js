@@ -23,6 +23,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import annotationRoutes from './routes/annotationRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
+import { ensureUploadDirs, UPLOADS_DIR } from './config/storage.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,14 +33,8 @@ connectDB();
 
 const app = express();
 
-// Ensure storage upload folder hierarchy exists
-const uploadDirs = ['uploads/videos', 'uploads/pdfs', 'uploads/images', 'uploads/resources'];
-uploadDirs.forEach((dir) => {
-  const dirPath = path.join(__dirname, dir);
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
-});
+// Ensure persistent storage upload folder hierarchy exists and migrate existing files
+ensureUploadDirs();
 
 // Dynamic CORS configuration to allow Vercel, Netlify, Render, and local development seamlessly with authentication credentials
 app.use(cors({
@@ -55,8 +50,16 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(morgan('dev'));
 
 // Static routing for media files and uploaded PDF/Video assets
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
+// 1. Primary persistent storage (immune to git auto-deploy and git resets)
+app.use('/uploads', express.static(UPLOADS_DIR));
+app.use('/api/uploads', express.static(UPLOADS_DIR));
+
+// 2. Fallback to local uploads folder if different from UPLOADS_DIR
+const localUploads = path.join(__dirname, 'uploads');
+if (localUploads !== UPLOADS_DIR) {
+  app.use('/uploads', express.static(localUploads));
+  app.use('/api/uploads', express.static(localUploads));
+}
 
 // Mount API Endpoints
 app.use('/api/auth', authRoutes);

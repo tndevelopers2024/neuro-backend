@@ -30,3 +30,4 @@ export const requireAdmin = (req, res, next) => {
     return res.status(403).json({ success: false, message: 'Forbidden - Requires administrator credentials' });
   }
 };
+
